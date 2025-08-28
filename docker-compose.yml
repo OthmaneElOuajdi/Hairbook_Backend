@@ -1,0 +1,43 @@
+# =============================================================================
+# 1. SERVICE - PostgreSQL (base de données locale)
+# =============================================================================
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: hairbook-postgres
+
+    # -----------------------------------------------------------------------------
+    # 1.1 AUTHENTICATION - Gestion des identifiants
+    # -----------------------------------------------------------------------------
+    environment:
+      POSTGRES_DB: hairbook
+      POSTGRES_USER: hairbook_user
+      POSTGRES_PASSWORD: hairbook_password
+      TZ: Europe/Brussels
+
+    # -----------------------------------------------------------------------------
+    # 1.2 NETWORK - Ports et accessibilité
+    # -----------------------------------------------------------------------------
+    ports:
+      - "5432:5432"
+
+    # -----------------------------------------------------------------------------
+    # 1.3 STORAGE - Persistance des données
+    # -----------------------------------------------------------------------------
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    # -----------------------------------------------------------------------------
+    # 1.4 HEALTHCHECK - Vérification de l’état du service
+    # -----------------------------------------------------------------------------
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hairbook_user -d hairbook"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+# =============================================================================
+# 2. VOLUMES - Définition des volumes persistants
+# =============================================================================
+volumes:
+  pgdata:
