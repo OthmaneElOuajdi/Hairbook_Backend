@@ -3,6 +3,7 @@ package com.hairbook.controller;
 import com.hairbook.dto.auth.AuthRequest;
 import com.hairbook.dto.auth.AuthResponse;
 import com.hairbook.dto.auth.RefreshTokenRequest;
+import com.hairbook.dto.user.UserCreateDTO;
 import com.hairbook.entity.User;
 import com.hairbook.service.UserService;
 import com.hairbook.service.RefreshTokenService;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 /**
  * Contrôleur pour la gestion des processus d'authentification des utilisateurs.
@@ -52,14 +54,25 @@ public class AuthController {
     /**
      * Enregistre un nouvel utilisateur dans le système.
      *
-     * @param user L'objet utilisateur à enregistrer.
+     * @param userCreateDTO Les données d'inscription de l'utilisateur.
      * @return Une entité de réponse avec les détails de l'utilisateur créé.
      */
     @PostMapping("/register")
     @Operation(summary = "Inscription d'un nouvel utilisateur")
-    public ResponseEntity<User> register(@RequestBody User user) {
-        User created = userService.register(user);
-        return ResponseEntity.ok(created);
+    public ResponseEntity<?> register(@RequestBody UserCreateDTO userCreateDTO) {
+        try {
+            // Convertir le DTO en entité User
+            User user = new User();
+            user.setFullName(userCreateDTO.getFullName());
+            user.setEmail(userCreateDTO.getEmail());
+            user.setPassword(userCreateDTO.getPassword());
+            user.setPhone(userCreateDTO.getPhone());
+            
+            User created = userService.register(user);
+            return ResponseEntity.ok(created);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     /**

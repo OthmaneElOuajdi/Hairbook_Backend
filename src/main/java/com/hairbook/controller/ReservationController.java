@@ -1,17 +1,22 @@
 package com.hairbook.controller;
 
 import com.hairbook.dto.reservation.ReservationCreateDTO;
+import com.hairbook.dto.reservation.ReservationResponseDTO;
 import com.hairbook.entity.Reservation;
 import com.hairbook.entity.ReservationStatus;
 import com.hairbook.entity.ServiceItem;
 import com.hairbook.entity.User;
+import com.hairbook.mapper.ReservationMapper;
 import com.hairbook.service.ReservationService;
+import com.hairbook.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -30,43 +35,50 @@ import java.util.Optional;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final UserService userService;
+    private final ReservationMapper reservationMapper;
 
     /**
-     * Construit un ReservationController avec le service requis.
+     * Construit un ReservationController avec les services requis.
      *
      * @param reservationService Service pour la gestion de la logique des
      *                           réservations.
+     * @param userService        Service pour la gestion des utilisateurs.
      */
-    public ReservationController(ReservationService reservationService) {
+    public ReservationController(ReservationService reservationService, UserService userService,
+            ReservationMapper reservationMapper) {
         this.reservationService = reservationService;
+        this.userService = userService;
+        this.reservationMapper = reservationMapper;
     }
 
     /**
-     * Crée une nouvelle réservation pour un utilisateur.
+     * Crée une nouvelle réservation pour l'utilisateur connecté.
      *
-     * @param dto    L'objet de transfert de données pour la création de la
-     *               réservation.
-     * @param userId L'ID de l'utilisateur qui effectue la réservation.
+     * @param dto            L'objet de transfert de données pour la création de la
+     *                       réservation.
+     * @param authentication L'objet d'authentification contenant les détails de
+     *                       l'utilisateur connecté.
      * @return Une entité de réponse avec la réservation créée.
      */
     @PostMapping
     @Operation(summary = "Créer une réservation")
     public ResponseEntity<Reservation> create(
             @Valid @RequestBody ReservationCreateDTO dto,
-            @RequestParam @Parameter(description = "Identifiant de l'utilisateur qui réserve", required = true, example = "1") Long userId) {
+            Authentication authentication) {
         Reservation r = new Reservation();
 
-        // rattacher l'utilisateur (proxy par id)
-        User u = new User();
-        u.setId(userId);
-        r.setUser(u);
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        String email = userDetails.getUsername();
 
-        // rattacher le service (proxy par id)
+        User user = userService.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        r.setUser(user);
+
         ServiceItem s = new ServiceItem();
         s.setId(dto.getServiceItemId());
         r.setServiceItem(s);
 
-        // utiliser le champ existant dans ton DTO
         r.setStartTime(dto.getReservationDateTime());
         r.setStatus(ReservationStatus.PENDING);
 
@@ -102,6 +114,29 @@ public class ReservationController {
     }
 
     /**
+     * Récupère toutes les réservations de l'utilisateur connecté.
+     *
+     * @param authentication L'objet d'authentification contenant les détails de
+     *                       l'utilisateur connecté.
+     * @return Une entité de réponse avec une liste des réservations de
+     *         l'utilisateur connecté.
+     */
+    @GetMapping("/my")
+    @Operation(summary = "Lister mes réservations")
+    public ResponseEntity<List<ReservationResponseDTO>> getMyReservations(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        String email = userDetails.getUsername();
+
+        return userService.findByEmail(email)
+                .map(user -> {
+                    List<Reservation> reservations = reservationService.findByUser(user.getId());
+                    List<ReservationResponseDTO> dtos = reservationMapper.toResponseDTOList(reservations);
+                    return ResponseEntity.ok(dtos);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
      * Trouve toutes les réservations dans un intervalle de temps donné.
      *
      * @param start La date et l'heure de début de la période.
@@ -130,6 +165,20 @@ public class ReservationController {
             @RequestParam ReservationStatus status) {
         Reservation updated = reservationService.updateStatus(id, status);
         return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Annule une réservation en changeant son statut à CANCELLED.
+     *
+     * @param id L'ID de la réservation à annuler.
+     * @return Une entité de réponse avec la réservation mise à jour.
+     */
+    @PutMapping("/{id}/cancel")
+    @Operation(summary = "Annuler une réservation")
+    public ResponseEntity<ReservationResponseDTO> cancelReservation(@PathVariable Long id) {
+        Reservation cancelled = reservationService.updateStatus(id, ReservationStatus.CANCELLED);
+        ReservationResponseDTO dto = reservationMapper.toResponseDTO(cancelled);
+        return ResponseEntity.ok(dto);
     }
 
     /**

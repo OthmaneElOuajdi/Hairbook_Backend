@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -99,10 +101,58 @@ public class UserController {
     @PutMapping("/{id}")
     @Operation(summary = "Mettre à jour un utilisateur")
     public ResponseEntity<User> update(@PathVariable Long id, @Valid @RequestBody User user) {
-        // sécurité : on impose l'id du path
+
         user.setId(id);
         User updated = userService.update(user);
         return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Récupère le profil de l'utilisateur authentifié.
+     *
+     * @param authentication L'objet d'authentification contenant les détails de
+     *                       l'utilisateur connecté.
+     * @return Une entité de réponse avec les données du profil utilisateur.
+     */
+    @GetMapping("/profile")
+    @Operation(summary = "Récupérer le profil de l'utilisateur connecté")
+    public ResponseEntity<User> getProfile(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        String email = userDetails.getUsername();
+
+        return userService.findByEmail(email)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Met à jour le profil de l'utilisateur authentifié.
+     *
+     * @param authentication L'objet d'authentification contenant les détails de
+     *                       l'utilisateur connecté.
+     * @param profileData    Les données de profil à mettre à jour.
+     * @return Une entité de réponse avec les données du profil mis à jour.
+     */
+    @PutMapping("/profile")
+    @Operation(summary = "Mettre à jour le profil de l'utilisateur connecté")
+    public ResponseEntity<User> updateProfile(Authentication authentication, @Valid @RequestBody User profileData) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        String email = userDetails.getUsername();
+
+        return userService.findByEmail(email)
+                .map(existingUser -> {
+
+                    if (profileData.getEmail() != null) {
+                        existingUser.setEmail(profileData.getEmail());
+                    }
+                    if (profileData.getPhone() != null) {
+                        existingUser.setPhone(profileData.getPhone());
+                    }
+
+                    User updated = userService.update(existingUser);
+                    return ResponseEntity.ok(updated);
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     /**
