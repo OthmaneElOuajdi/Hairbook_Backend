@@ -14,7 +14,7 @@ public class ReservationResponseDTO {
     private Long id;
 
     @Schema(description = "Date et heure de la réservation")
-    @JsonFormat(pattern = "dd/MM/yyyy HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime reservationDateTime;
 
     @Schema(description = "Statut de la réservation")
@@ -38,12 +38,15 @@ public class ReservationResponseDTO {
     @Schema(description = "Prix du service")
     private BigDecimal servicePrice;
 
+    @Schema(description = "Durée du service en minutes")
+    private Integer serviceDuration;
+
     @Schema(description = "Date de création")
-    @JsonFormat(pattern = "dd/MM/yyyy HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
 
     @Schema(description = "Date de dernière modification")
-    @JsonFormat(pattern = "dd/MM/yyyy HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime updatedAt;
 
     public ReservationResponseDTO() {
@@ -135,5 +138,13 @@ public class ReservationResponseDTO {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getServiceDuration() {
+        return serviceDuration;
+    }
+
+    public void setServiceDuration(Integer serviceDuration) {
+        this.serviceDuration = serviceDuration;
     }
 }
