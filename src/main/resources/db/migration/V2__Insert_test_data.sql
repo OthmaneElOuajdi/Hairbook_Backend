@@ -15,9 +15,13 @@ SELECT
     '04' || (70000000 + i),
     floor(random() * 500)
 FROM
-    generate_series(1, 100) AS i,
-    (SELECT (ARRAY['Jean', 'Pierre', 'Marie', 'Sophie', 'Lucas', 'Emma', 'Louis', 'Chloé', 'Gabriel', 'Léa', 'Thomas', 'Manon', 'Hugo', 'Camille', 'Arthur', 'Inès'])[floor(random() * 16) + 1]) AS first_name,
-    (SELECT (ARRAY['Dupont', 'Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel', 'Garcia'])[floor(random() * 16) + 1]) AS last_name;
+    generate_series(1, 100) AS i
+CROSS JOIN (
+    SELECT (ARRAY['Jean', 'Pierre', 'Marie', 'Sophie', 'Lucas', 'Emma', 'Louis', 'Chloé', 'Gabriel', 'Léa', 'Thomas', 'Manon', 'Hugo', 'Camille', 'Arthur', 'Inès'])[floor(random() * 16) + 1] AS first_name
+) AS fn
+CROSS JOIN (
+    SELECT (ARRAY['Dupont', 'Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel', 'Garcia'])[floor(random() * 16) + 1] AS last_name
+) AS ln;
 
 -- Add a specific admin user
 INSERT INTO users (full_name, email, password, phone, loyalty_points) VALUES ('Admin Hairbook', 'admin@hairbook.com', 'adminpass', '0412345678', 1000);
