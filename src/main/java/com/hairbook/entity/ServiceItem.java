@@ -33,6 +33,10 @@ public class ServiceItem {
     @Schema(description = "Description détaillée du service")
     private String description;
 
+    @Schema(description = "Durée du service en minutes")
+    @Column(nullable = false)
+    private int duration;
+
     public ServiceItem() {
     }
 
@@ -74,6 +78,14 @@ public class ServiceItem {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public int getDuration() {
+        return duration;
+    }
+
+    public void setDuration(int duration) {
+        this.duration = duration;
     }
 
 }

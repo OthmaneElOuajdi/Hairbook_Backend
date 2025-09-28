@@ -14,7 +14,6 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Index;
 
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -64,6 +63,7 @@ public class Reservation {
     }
 
     // --- Hooks automatiques pour les dates ---
+    @jakarta.persistence.PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
