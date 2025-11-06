@@ -1,88 +1,89 @@
 package com.hairbook.entity;
 
-import java.time.DayOfWeek;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.UUID;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-
+/**
+ * Définit les heures de travail d’un membre du personnel pour un jour donné.
+ *
+ * <p>Chaque enregistrement correspond à un jour de la semaine et
+ * précise les heures de début, de fin et de pause éventuelle.</p>
+ *
+ * <ul>
+ *   <li>{@link #dayOfWeek} suit la convention Java : 1 = Lundi, 7 = Dimanche</li>
+ *   <li>{@link #breakStart} et {@link #breakEnd} sont optionnels</li>
+ *   <li>Chaque membre du staff ne peut avoir qu’une ligne par jour
+ *       (grâce à la contrainte d’unicité staff_id + day_of_week).</li>
+ * </ul>
+ */
 @Entity
-@Table(name = "working_hours", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_workinghours_day", columnNames = { "dayOfWeek" })
-})
-@Schema(description = "Horaires d'ouverture du salon par jour")
+@Table(
+        name = "working_hours",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"staff_id", "day_of_week"})
+        }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class WorkingHours {
 
+    /** Identifiant unique de la ligne d’horaire. */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "Identifiant unique de la ligne d'horaire")
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @Schema(description = "Jour de la semaine")
-    @Enumerated(EnumType.STRING)
-    @Column(name = "day_of_week", nullable = false, length = 16)
-    private DayOfWeek dayOfWeek;
+    /** Membre du personnel concerné par ces horaires. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "staff_id", nullable = false)
+    private StaffMember staffMember;
 
-    @Schema(description = "Heure d'ouverture (null si fermé)")
+    /**
+     * Jour de la semaine (1 = lundi, 7 = dimanche).
+     * Peut être mappé à {@link java.time.DayOfWeek}.
+     */
+    @Column(name = "day_of_week", nullable = false)
+    private Integer dayOfWeek;
+
+    /** Heure de début de la journée de travail. */
+    @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
-    @Schema(description = "Heure de fermeture (null si fermé)")
+    /** Heure de fin de la journée de travail. */
+    @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
 
-    @Schema(description = "Indique si le salon est fermé ce jour-là")
-    @Column(nullable = false)
-    private boolean closed = false;
+    /** Début de la pause (optionnel). */
+    @Column(name = "break_start")
+    private LocalTime breakStart;
 
-    public WorkingHours() {
+    /** Fin de la pause (optionnel). */
+    @Column(name = "break_end")
+    private LocalTime breakEnd;
+
+    /** Date de création de l’enregistrement (auto-générée). */
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+
+    // -------------------------------------------------------------
+    // Méthodes utilitaires métier
+    // -------------------------------------------------------------
+
+    /**
+     * Vérifie si une pause est définie.
+     *
+     * @return true si breakStart et breakEnd sont renseignés.
+     */
+    public boolean hasBreak() {
+        return breakStart != null && breakEnd != null;
     }
-
-    @PrePersist
-    @PreUpdate
-    private void validateTimes() {
-        if (closed) {
-            // s'il est fermé, on tolère start/end null
-            return;
-        }
-        if (startTime == null || endTime == null) {
-            throw new IllegalArgumentException("startTime et endTime sont requis quand closed = false");
-        }
-        if (!endTime.isAfter(startTime)) {
-            throw new IllegalArgumentException("endTime doit être strictement après startTime");
-        }
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setDayOfWeek(DayOfWeek dayOfWeek) {
-        this.dayOfWeek = dayOfWeek;
-    }
-
-    public void setStartTime(LocalTime startTime) {
-        this.startTime = startTime;
-    }
-
-    public void setEndTime(LocalTime endTime) {
-        this.endTime = endTime;
-    }
-
-    public void setClosed(boolean closed) {
-        this.closed = closed;
-    }
-
 }
