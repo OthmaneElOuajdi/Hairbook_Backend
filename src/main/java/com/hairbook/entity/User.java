@@ -1,194 +1,119 @@
 package com.hairbook.entity;
 
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
-import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
-import com.hairbook.validation.ValidBelgianPhone;
-import com.hairbook.validation.ValidNonDisposableEmail;
-
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-
+/**
+ * Représente un utilisateur du système (client ou membre du staff).
+ *
+ * <p>L'email sert d'identifiant unique pour la connexion.</p>
+ *
+ * <p>Les rôles définissent les permissions d'accès :</p>
+ * <ul>
+ *   <li>ROLE_CLIENT → prise de rendez-vous</li>
+ *   <li>ROLE_STAFF → gestion des rendez-vous assignés</li>
+ *   <li>ROLE_ADMIN → accès global + gestion du personnel</li>
+ * </ul>
+ *
+ * <p>Le mot de passe stocké est toujours
+ * un hash sécurisé (ex: BCrypt), jamais en clair.</p>
+ */
 @Entity
 @Table(name = "users")
-@Schema(description = "Représente un utilisateur de l'application Hairbook")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class User {
 
+    /** Identifiant unique de l’utilisateur (UUID). */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "Identifiant unique de l'utilisateur")
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @Schema(description = "Nom complet de l'utilisateur")
-    @Column(nullable = false)
-    @NotBlank(message = "Le nom complet est obligatoire")
-    @Size(min = 2, max = 100, message = "Le nom doit contenir entre 2 et 100 caractères")
-    private String fullName;
-
-    @Schema(description = "Adresse e-mail unique utilisée pour la connexion (emails jetables interdits)")
-    @Column(nullable = false, unique = true)
-    @NotBlank(message = "L'adresse email est obligatoire")
-    @Email(message = "Format d'email invalide")
-    @ValidNonDisposableEmail
+    /** Adresse email unique servant d’identifiant de connexion. */
+    @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Schema(description = "Mot de passe haché")
-    @Column(nullable = false)
-    @NotBlank(message = "Le mot de passe est obligatoire")
-    private String password;
+    /** Hash du mot de passe (ex: BCrypt) — jamais stocker en clair ! */
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
 
-    @Schema(description = "Numéro de téléphone belge (GSM ou fixe)")
-    @ValidBelgianPhone(mobileOnly = false)
+    /** Prénom de l’utilisateur (optionnel). */
+    @Column(name = "first_name", length = 80)
+    private String firstName;
+
+    /** Nom de famille de l’utilisateur (optionnel). */
+    @Column(name = "last_name", length = 80)
+    private String lastName;
+
+    /** Téléphone de contact du client/staff. */
+    @Column(length = 32)
     private String phone;
 
-    @Schema(description = "Date d'inscription")
-    @Column(nullable = false, updatable = false)
+    /**
+     * Rôles attribués à l’utilisateur.
+     * Stockés sous forme de chaînes ex: "ROLE_ADMIN".
+     * Utilisé par Spring Security pour les autorisations.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "role")
+    private Set<String> roles;
+
+    /** Indique si l’adresse email a été vérifiée (gestion confirmation). */
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
+    /** Token de vérification d'email (généré lors de l'inscription). */
+    @Column(name = "email_verification_token")
+    private String emailVerificationToken;
+
+    /** Date d'expiration du token de vérification. */
+    @Column(name = "email_verification_token_expires_at")
+    private LocalDateTime emailVerificationTokenExpiresAt;
+
+    /** Permet de bloquer un compte sans le supprimer. */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
+
+    /** Points de fidélité accumulés par le client. */
+    @Column(name = "loyalty_points", nullable = false)
+    @Builder.Default
+    private Integer loyaltyPoints = 0;
+
+    /** Chemin vers la photo de profil de l'utilisateur. */
+    @Column(name = "profile_picture")
+    private String profilePicture;
+
+    /** Date à laquelle la suppression du compte est programmée (null si pas de suppression prévue). */
+    @Column(name = "deletion_scheduled_at")
+    private LocalDateTime deletionScheduledAt;
+
+    /** Date de création du compte utilisateur. */
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Schema(description = "Date de dernière modification")
+    /** Date de dernière modification du compte. */
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    @Schema(description = "Date de dernière connexion")
-    private LocalDateTime lastLoginAt;
+    // -----------------------------------------------------------------
+    // Méthodes métier utilitaires
+    // -----------------------------------------------------------------
 
-    @Schema(description = "Points de fidélité accumulés")
-    @Column(nullable = false)
-    private int loyaltyPoints = 0;
-
-    @Schema(description = "Rôles attribués à l'utilisateur (ex: ROLE_MEMBER, ROLE_ADMIN)")
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
-    private Set<Role> roles = new HashSet<>();
-
-    @Schema(description = "Réservations associées à l'utilisateur")
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Reservation> reservations = new HashSet<>();
-
-    @Schema(description = "Paiements effectués par l'utilisateur")
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<Payment> payments = new HashSet<>();
-
-    public User() {
+    public boolean hasRole(String role) {
+        return roles != null && roles.contains(role.toUpperCase());
     }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public LocalDateTime getLastLoginAt() {
-        return lastLoginAt;
-    }
-
-    public void setLastLoginAt(LocalDateTime lastLoginAt) {
-        this.lastLoginAt = lastLoginAt;
-    }
-
-    public int getLoyaltyPoints() {
-        return loyaltyPoints;
-    }
-
-    public void setLoyaltyPoints(int loyaltyPoints) {
-        this.loyaltyPoints = loyaltyPoints;
-    }
-
-    public Set<Role> getRoles() {
-        return roles;
-    }
-
-    public void setRoles(Set<Role> roles) {
-        this.roles = roles;
-    }
-
-    public Set<Reservation> getReservations() {
-        return reservations;
-    }
-
-    public void setReservations(Set<Reservation> reservations) {
-        this.reservations = reservations;
-    }
-
-    public Set<Payment> getPayments() {
-        return payments;
-    }
-
-    public void setPayments(Set<Payment> payments) {
-        this.payments = payments;
-    }
-
 }
