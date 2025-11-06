@@ -1,120 +1,84 @@
 package com.hairbook.entity;
 
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.UUID;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-
+/**
+ * Journalisation des actions sensibles dans le système.<br>
+ * Cette entité permet de tracer :
+ * <ul>
+ *   <li>Quel utilisateur a réalisé une action</li>
+ *   <li>À quel moment</li>
+ *   <li>Sur quelle entité du domaine</li>
+ *   <li>Depuis quelle adresse IP et quel device</li>
+ *   <li>Avec un contexte additionnel encapsulé en JSON</li>
+ * </ul>
+ *
+ * Exemples d'actions :
+ * <pre>
+ * - "APPOINTMENT_CREATED"
+ * - "USER_LOGIN_FAILED"
+ * - "PAYMENT_REFUNDED"
+ * </pre>
+ *
+ * Cette table est conçue pour faciliter les audits sécurité & conformité légale.
+ */
 @Entity
-@Table(name = "audit_logs", indexes = {
-        @Index(name = "idx_audit_entity", columnList = "entity_name,entity_id"),
-        @Index(name = "idx_audit_createdAt", columnList = "created_at")
-})
-@Schema(description = "Historique des actions (sécurité, administration, système)")
+@Table(name = "audit_log")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class AuditLog {
 
+    /** Identifiant unique du log d’audit. */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "Identifiant unique du log")
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @Schema(description = "Utilisateur à l'origine de l'action (null si action système)")
-    @ManyToOne
+    /** Utilisateur ayant déclenché l’action (peut être null si anonyme/externe). */
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Schema(description = "Nom de l'entité affectée (ex: 'Reservation', 'User')")
-    @Column(name = "entity_name", nullable = false, length = 120)
-    private String entityName;
-
-    @Schema(description = "Identifiant de l'entité affectée")
-    @Column(name = "entity_id")
-    private Long entityId;
-
-    @Schema(description = "Action réalisée (CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.)")
-    @Column(nullable = false, length = 60)
+    /** Type d’action exécutée (ex: LOGIN_SUCCESS, APPOINTMENT_CANCELLED...) */
+    @Column(nullable = false, length = 100)
     private String action;
 
-    @Schema(description = "Détails supplémentaires (JSON ou texte libre)")
-    @Column(columnDefinition = "text")
-    private String details;
+    /** Type de l'entité impactée (ex: Appointment, Payment...). */
+    @Column(name = "entity_type", length = 50)
+    private String entityType;
 
-    @Schema(description = "Date/heure de l'action")
+    /** Identifiant de l'entité impactée. */
+    @Column(name = "entity_id")
+    private UUID entityId;
+
+    /**
+     * Informations contextuelles optionnelles (avant/après, causes, diffs...)
+     * Stockées au format JSONB dans PostgreSQL, JSON dans H2.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details")
+    private Map<String, Object> details;
+
+    /** Adresse IP de l’utilisateur ayant généré l’événement. */
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
+    /** User-Agent HTTP permettant d’identifier le device & navigateur. */
+    @Column(name = "user_agent", length = 500)
+    private String userAgent;
+
+    /** Horodatage automatique de la création du log. */
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
-
-    public AuditLog() {
-    }
-
-    // --- Hooks automatiques ---
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public String getEntityName() {
-        return entityName;
-    }
-
-    public void setEntityName(String entityName) {
-        this.entityName = entityName;
-    }
-
-    public Long getEntityId() {
-        return entityId;
-    }
-
-    public void setEntityId(Long entityId) {
-        this.entityId = entityId;
-    }
-
-    public String getAction() {
-        return action;
-    }
-
-    public void setAction(String action) {
-        this.action = action;
-    }
-
-    public String getDetails() {
-        return details;
-    }
-
-    public void setDetails(String details) {
-        this.details = details;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
 }
