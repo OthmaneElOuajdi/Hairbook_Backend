@@ -1,175 +1,115 @@
 package com.hairbook.entity;
 
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.UUID;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-
+/**
+ * Représente un paiement associé à un rendez-vous dans le système.
+ *
+ * <p>Conçu pour supporter différents prestataires (Stripe par défaut),
+ * avec une structure flexible permettant de stocker des informations
+ * complémentaires en JSONB (Supabase/PostgreSQL).</p>
+ *
+ * <p>Chaque paiement est attaché à un {@link Appointment} unique et possède
+ * un statut évolutif afin de suivre son cycle de vie :</p>
+ *
+ * <ul>
+ *   <li>PENDING → en attente de confirmation du prestataire</li>
+ *   <li>SUCCEEDED → transaction validée</li>
+ *   <li>FAILED → échec du paiement</li>
+ *   <li>REFUNDED → remboursement partiel ou total effectué</li>
+ * </ul>
+ */
 @Entity
-@Table(name = "payments")
-@Schema(description = "Représente un paiement effectué par un utilisateur")
+@Table(name = "payment", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "provider", "provider_payment_id" })
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Payment {
 
+    /** Identifiant unique du paiement (UUID). */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Schema(description = "Identifiant unique du paiement")
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
-    @Schema(description = "Utilisateur ayant effectué le paiement")
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "user_id")
-    private User user;
+    /** Rendez-vous auquel ce paiement se rattache. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "appointment_id", nullable = false)
+    private Appointment appointment;
 
-    @Schema(description = "Réservation associée au paiement")
-    @OneToOne(optional = false)
-    @JoinColumn(name = "reservation_id")
-    private Reservation reservation;
+    /** Prestataire de paiement (Stripe par défaut). */
+    @Column(nullable = false, length = 32)
+    @Builder.Default
+    private String provider = "STRIPE";
 
-    @Schema(description = "Montant du paiement en euros")
-    @Column(nullable = false)
-    private double amount;
+    /** ID de paiement fourni par le prestataire (ex: Stripe charge ID). */
+    @Column(name = "provider_payment_id", length = 128)
+    private String providerPaymentId;
 
-    @Schema(description = "Statut du paiement (PENDING, COMPLETED, FAILED)")
+    /** ID de session fourni par le prestataire (utile pour Stripe Checkout). */
+    @Column(name = "provider_session_id", length = 128)
+    private String providerSessionId;
+
+    /** URL de paiement (pour Stripe Checkout). */
+    @Column(name = "checkout_url", length = 512)
+    private String checkoutUrl;
+
+    /** Montant payé en centimes (ex: 1299 = 12,99€). */
+    @Column(name = "amount_cents", nullable = false)
+    private Integer amountCents;
+
+    /** Devise du paiement (EUR par défaut). */
+    @Column(nullable = false, length = 8)
+    @Builder.Default
+    private String currency = "EUR";
+
+    /** Statut du paiement (PENDING, SUCCEEDED, FAILED, REFUNDED...). */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PaymentStatus status;
+    @Column(name = "status", nullable = false, length = 16)
+    @Builder.Default
+    private PaymentStatus status = PaymentStatus.PENDING;
 
-    @Schema(description = "Message lié au paiement (erreur, confirmation, etc.)")
-    @Column(length = 500)
-    private String message;
+    /**
+     * Données complémentaires fournies par le prestataire
+     * (ex: reçus, détails carte, logs d'erreur…).
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata")
+    private Map<String, Object> metadata;
 
-    @Schema(description = "Date et heure du paiement")
-    @Column(nullable = false, updatable = false)
-    private LocalDateTime paymentDate;
-
-    @Schema(description = "Méthode de paiement utilisée (ex: Carte, PayPal, Bancontact)")
-    @Column(length = 50)
-    private String paymentMethod;
-
-    @Schema(description = "Identifiant de transaction externe (fourni par le prestataire de paiement)")
-    @Column(length = 100)
-    private String transactionId;
-
-    @Schema(description = "Date de création de l'enregistrement")
-    @Column(nullable = false, updatable = false)
+    /** Date de création du paiement. */
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Schema(description = "Date de dernière modification de l'enregistrement")
+    /** Dernière mise à jour du paiement. */
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    public Payment() {
+    // ---------------------------------------
+    // Méthodes métier
+    // ---------------------------------------
+
+    /** Marque le paiement comme réussi. */
+    public void markSucceeded() {
+        this.status = PaymentStatus.SUCCEEDED;
     }
 
-    @PrePersist
-    public void prePersist() {
-        this.paymentDate = LocalDateTime.now();
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+    /** Marque le paiement comme échoué. */
+    public void markFailed() {
+        this.status = PaymentStatus.FAILED;
     }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public Reservation getReservation() {
-        return reservation;
-    }
-
-    public void setReservation(Reservation reservation) {
-        this.reservation = reservation;
-    }
-
-    public double getAmount() {
-        return amount;
-    }
-
-    public void setAmount(double amount) {
-        this.amount = amount;
-    }
-
-    public PaymentStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(PaymentStatus status) {
-        this.status = status;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public LocalDateTime getPaymentDate() {
-        return paymentDate;
-    }
-
-    public void setPaymentDate(LocalDateTime paymentDate) {
-        this.paymentDate = paymentDate;
-    }
-
-    public String getPaymentMethod() {
-        return paymentMethod;
-    }
-
-    public void setPaymentMethod(String paymentMethod) {
-        this.paymentMethod = paymentMethod;
-    }
-
-    public String getTransactionId() {
-        return transactionId;
-    }
-
-    public void setTransactionId(String transactionId) {
-        this.transactionId = transactionId;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
 }
