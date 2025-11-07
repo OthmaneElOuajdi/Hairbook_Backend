@@ -1,19 +1,31 @@
 package com.hairbook.entity;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(description = "Statut d'un paiement")
+/**
+ * Représente le cycle de vie d'un paiement dans le système.
+ *
+ * <ul>
+ *   <li>{@link #PENDING} → Transaction initiée, mais pas encore confirmée</li>
+ *   <li>{@link #SUCCEEDED} → Paiement validé par le prestataire</li>
+ *   <li>{@link #FAILED} → Échec lors du traitement du paiement</li>
+ *   <li>{@link #REFUNDED} → Remboursement partiel ou total effectué</li>
+ * </ul>
+ *
+ * Ces statuts permettent à l'application de gérer correctement :
+ * - l'accès au service (confirmation du rendez-vous)
+ * - l'annulation/remboursement
+ * - la gestion des retours de Stripe ou autre PSP
+ */
 public enum PaymentStatus {
 
-    @Schema(description = "Paiement en attente")
+    /** Paiement en attente de confirmation par le prestataire. */
     PENDING,
 
-    @Schema(description = "Paiement réussi")
-    COMPLETED,
+    /** Paiement validé avec succès et fonds transférés. */
+    SUCCEEDED,
 
-    @Schema(description = "Paiement échoué")
+    /** Paiement refusé ou erreur de traitement. */
     FAILED,
 
-    @Schema(description = "Paiement remboursé")
+    /** Paiement remboursé par le salon ou à la demande du client. */
     REFUNDED
 }
