@@ -1,33 +1,55 @@
 package com.hairbook.config;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.caffeine.CaffeineCacheManager;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.TimeUnit;
+
 /**
- * Configuration du cache Redis pour optimiser les performances.
- * <p>
- * Définit les noms des caches et leurs configurations TTL respectives.
- * Les noms des caches sont centralisés dans la classe interne
- * {@link CacheNames}
- * pour garantir la cohérence dans toute l'application.
+ * Configuration centrale du cache applicatif.
+ *
+ * <p>Utilise la bibliothèque <b>Caffeine</b> pour gérer un cache
+ * en mémoire haute performance, avec une expiration automatique
+ * des entrées et des statistiques activées.</p>
+ *
+ * <p>Les caches définis ici permettent d'améliorer les performances
+ * en évitant des appels répétés à la base de données ou à des services
+ * externes (par ex. récupération des employés, créneaux disponibles, etc.).</p>
  */
 @Configuration
+@EnableCaching
 public class CacheConfig {
 
     /**
-     * Contient les noms des caches utilisés dans l'application.
-     * Utiliser ces constantes avec les annotations @Cacheable, @CacheEvict, etc.
+     * Déclare et configure le gestionnaire de caches Caffeine.
+     *
+     * <ul>
+     *   <li><b>maximumSize</b> : limite du nombre d’entrées en mémoire</li>
+     *   <li><b>expireAfterWrite</b> : durée de vie d’une entrée après écriture</li>
+     *   <li><b>recordStats</b> : active les statistiques (ex: hit ratio)</li>
+     * </ul>
+     *
+     * @return un {@link CacheManager} configuré pour l’application.
      */
-    public static final class CacheNames {
-        public static final String USERS = "users";
-        public static final String SERVICES = "services";
-        public static final String WORKING_HOURS = "working-hours";
-        public static final String ROLES = "roles";
-        public static final String RESERVATIONS = "reservations";
-        public static final String LOYALTY_POINTS = "loyalty-points";
-        public static final String NOTIFICATIONS = "notifications";
-        public static final String STATISTICS = "statistics";
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager cacheManager = new CaffeineCacheManager(
+                "services",
+                "staffMembers",
+                "workingHours",
+                "holidays",
+                "availableSlots"
+        );
 
-        private CacheNames() {
-        }
+        cacheManager.setCaffeine(Caffeine.newBuilder()
+                .maximumSize(500)                     // nombre max d’objets en cache
+                .expireAfterWrite(10, TimeUnit.MINUTES) // TTL : 10 min
+                .recordStats());                       // statistiques activées
+
+        return cacheManager;
     }
 }
