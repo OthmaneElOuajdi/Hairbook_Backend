@@ -4,7 +4,6 @@ import com.hairbook.dto.reservation.ReservationCreateDTO;
 import com.hairbook.dto.reservation.ReservationResponseDTO;
 import com.hairbook.entity.Reservation;
 import com.hairbook.entity.ReservationStatus;
-import com.hairbook.entity.ServiceItem;
 import com.hairbook.entity.User;
 import com.hairbook.mapper.ReservationMapper;
 import com.hairbook.service.ReservationService;

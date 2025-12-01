@@ -1,60 +1,60 @@
 package com.hairbook.dto.auth;
 
-import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Schema(description = "Réponse d'authentification contenant les jetons")
+import java.util.List;
+
+/**
+ * Réponse renvoyée au client après une authentification réussie
+ * (inscription ou connexion).
+ *
+ * <p>Ce DTO contient le jeton JWT d’accès ainsi que les
+ * informations principales de l’utilisateur connecté.
+ * Il est utilisé par le frontend pour stocker le token
+ * et afficher les données du profil utilisateur.</p>
+ *
+ * <h3>Exemple JSON :</h3>
+ * <pre>
+ * {
+ *   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ *   "email": "client@exemple.com",
+ *   "firstName": "Marie",
+ *   "lastName": "Dupont",
+ *   "roles": ["ROLE_CLIENT"]
+ * }
+ * </pre>
+ *
+ * <p>Le champ <code>token</code> doit être transmis dans l’en-tête
+ * <code>Authorization</code> de chaque requête sécurisée sous la forme :
+ * <code>Bearer &lt;token&gt;</code>.</p>
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class AuthResponse {
 
-    @Schema(description = "Jeton d'accès JWT")
-    private String accessToken;
+    /** Jeton JWT d’authentification permettant d’accéder aux endpoints sécurisés. */
+    private String token;
 
-    @Schema(description = "Jeton de rafraîchissement")
-    private String refreshToken;
+    /** Adresse e-mail de l’utilisateur authentifié. */
+    private String email;
 
-    @Schema(description = "Type de jeton")
-    private String tokenType = "Bearer";
+    /** Prénom de l’utilisateur. */
+    private String firstName;
 
-    @Schema(description = "Durée de validité du jeton d'accès en secondes")
-    private long expiresIn;
+    /** Nom de famille de l'utilisateur. */
+    private String lastName;
 
-    public AuthResponse() {
-    }
+    /** Numéro de téléphone de l'utilisateur. */
+    private String phone;
 
-    public AuthResponse(String accessToken, String refreshToken, long expiresIn) {
-        this.accessToken = accessToken;
-        this.refreshToken = refreshToken;
-        this.expiresIn = expiresIn;
-    }
+    /** Liste des rôles attribués à l’utilisateur (ex. : ROLE_CLIENT, ROLE_ADMIN). */
+    private List<String> roles;
 
-    public String getAccessToken() {
-        return accessToken;
-    }
-
-    public void setAccessToken(String accessToken) {
-        this.accessToken = accessToken;
-    }
-
-    public String getRefreshToken() {
-        return refreshToken;
-    }
-
-    public void setRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
-    }
-
-    public String getTokenType() {
-        return tokenType;
-    }
-
-    public void setTokenType(String tokenType) {
-        this.tokenType = tokenType;
-    }
-
-    public long getExpiresIn() {
-        return expiresIn;
-    }
-
-    public void setExpiresIn(long expiresIn) {
-        this.expiresIn = expiresIn;
-    }
+    /** Message optionnel à afficher à l'utilisateur (ex: message de bienvenue). */
+    private String message;
 }

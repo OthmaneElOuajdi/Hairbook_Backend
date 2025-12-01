@@ -1,6 +1,5 @@
 package com.hairbook.controller;
 
-import com.hairbook.entity.ServiceItem;
 import com.hairbook.service.ServiceItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
